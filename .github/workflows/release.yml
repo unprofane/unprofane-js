@@ -1,0 +1,55 @@
+# Test every push; when package.json names a version npm does not have yet,
+# stage it on npm by trusted publishing (no token, with provenance) and tag
+# it. A staged version installs for nobody until a maintainer approves it
+# with 2FA (the email from npm, npmjs.com, or `npm stage approve <id>`): the
+# trusted publisher is stage-only, so this workflow cannot publish alone.
+# This repository is synced from the Unprofane monorepo by
+# `npm run sdks:sync`; change the code there.
+name: release
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+      # Staged publishing needs npm 11.15.0 or later.
+      - run: npm install -g npm@latest
+      - run: npm install --no-audit --no-fund
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+      - id: version
+        run: |
+          v=$(node -p "require('./package.json').version")
+          echo "version=$v" >> "$GITHUB_OUTPUT"
+          if npm view "@unprofane/sdk@$v" version > /dev/null 2>&1; then
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "publish=true" >> "$GITHUB_OUTPUT"
+          fi
+      - if: steps.version.outputs.publish == 'true'
+        run: npm stage publish
+      # Tag the version as a GitHub release once, whether it was published
+      # by this run or before (a re-created repository gets its releases back).
+      - run: |
+          v="v${{ steps.version.outputs.version }}"
+          gh release view "$v" > /dev/null 2>&1 || gh release create "$v" --target "$GITHUB_SHA" --title "$v" --notes "Staged on npm as @unprofane/sdk@${{ steps.version.outputs.version }}; installable once a maintainer approves it."
+        env:
+          GH_TOKEN: ${{ github.token }}

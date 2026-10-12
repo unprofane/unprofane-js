@@ -1,0 +1,21 @@
+{
+  // Self-contained rather than extending the monorepo's base config: this
+  // folder is also the public repo unprofane/unprofane-js
+  // (scripts/sync-sdks.mjs).
+  "compilerOptions": {
+    "target": "ES2023",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "noImplicitOverride": true,
+    "allowImportingTsExtensions": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "skipLibCheck": true,
+    "noEmit": true,
+    "types": ["node"]
+  },
+  "include": ["src/**/*", "*.ts"]
+}
