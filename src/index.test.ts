@@ -1,5 +1,6 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it, vi } from 'vitest';
-import { backoff, Unprofane, UnprofaneError } from './index.ts';
+import { backoff, SDK_VERSION, Unprofane, UnprofaneError } from './index.ts';
 
 const ok = (body: unknown, status = 200, headers: Record<string, string> = {}) =>
   new Response(JSON.stringify(body), {
@@ -8,6 +9,11 @@ const ok = (body: unknown, status = 200, headers: Record<string, string> = {}) =
   });
 
 describe('the JavaScript SDK', () => {
+  it('reports the version package.json publishes', () => {
+    const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
+    expect(SDK_VERSION).toBe(pkg.version);
+  });
+
   it('sends the bearer key and the body, and parses the answer', async () => {
     const fetchMock = vi.fn(async () => ok({ allowed: false, action: 'block' }));
     const c = new Unprofane('up_test_abc', { fetch: fetchMock as unknown as typeof fetch });

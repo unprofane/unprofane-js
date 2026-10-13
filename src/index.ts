@@ -54,7 +54,7 @@ export class UnprofaneError extends Error {
 
 const RETRYABLE = new Set([429, 502, 503, 504]);
 const MAX_BATCH = 100;
-export const SDK_VERSION = '0.1.0';
+export const SDK_VERSION = '0.1.2';
 
 export class Unprofane {
   private readonly apiKey: string;
