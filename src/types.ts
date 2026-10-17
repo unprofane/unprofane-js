@@ -63,7 +63,9 @@ export type Language =
   | 'he'
   | 'hi'
   | 'id'
-  | 'ja';
+  | 'ja'
+  | 'zh'
+  | 'ko';
 /** A preset, a saved policy id (pol_…) or a map of category to action. */
 export type Policy = PolicyPreset | string | Partial<Record<PolicyCategory, Action>>;
 
@@ -127,6 +129,7 @@ export interface BatchRequest {
   context?: Context;
   policy?: Policy;
   mode?: Mode;
+  language?: Language;
   mask?: Mask;
   engine?: string;
   lists?: RequestLists;
@@ -144,7 +147,7 @@ export interface FeedbackRequest {
   verdict: 'false_positive' | 'false_negative' | 'correct';
   expected_action?: Action;
   note?: string;
-  /** Stored only when sent, deleted with the account. */
+  /** Stored with the account only when sent, deleted with the account. */
   text?: string;
 }
 export interface FeedbackResponse {

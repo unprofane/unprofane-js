@@ -54,7 +54,7 @@ export class UnprofaneError extends Error {
 
 const RETRYABLE = new Set([429, 502, 503, 504]);
 const MAX_BATCH = 100;
-export const SDK_VERSION = '0.1.2';
+export const SDK_VERSION = '0.1.3';
 
 export class Unprofane {
   private readonly apiKey: string;
@@ -112,7 +112,7 @@ export class Unprofane {
     return out.flat();
   }
 
-  /** Report a wrong result. `text` is stored only if you include it. */
+  /** Report a wrong result. `text` is stored with your account only if you include it. */
   feedback(request: FeedbackRequest): Promise<FeedbackResponse> {
     return this.call<FeedbackResponse>('POST', '/v1/feedback', request);
   }
