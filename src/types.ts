@@ -46,7 +46,10 @@ export type EvasionTag =
   | 'reversed'
   | 'concatenation'
   | 'case_mixing'
-  | 'self_censored';
+  | 'self_censored'
+  | 'misspelled'
+  | 'spoonerism'
+  | 'pun';
 export type Language =
   | 'auto'
   | 'en'

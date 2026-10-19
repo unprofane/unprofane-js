@@ -8,7 +8,7 @@
  *
  * No dependencies: `fetch` from the runtime (Node 18+, Bun, Deno, Workers,
  * browsers with a publishable key). Retries with jitter on 429, 502, 503,
- * 504 and network failures, honouring Retry-After; a 4xx other than 429
+ * 504 and network failures, honoring Retry-After; a 4xx other than 429
  * is thrown once as an UnprofaneError carrying the problem details.
  */
 import type {
@@ -54,7 +54,12 @@ export class UnprofaneError extends Error {
 
 const RETRYABLE = new Set([429, 502, 503, 504]);
 const MAX_BATCH = 100;
-export const SDK_VERSION = '0.1.3';
+/** The most characters (UTF-16 code units, a string's length) the API reads
+ * in one batch, every text together: a batch over it is refused whole. */
+export const MAX_BATCH_CHARS = 30_000;
+const charsOf = (items: ReadonlyArray<{ text: string }>) =>
+  items.reduce((n, i) => n + i.text.length, 0);
+export const SDK_VERSION = '0.1.4';
 
 export class Unprofane {
   private readonly apiKey: string;
@@ -78,18 +83,24 @@ export class Unprofane {
     return this.call<CheckResponse>('POST', '/v1/check', request);
   }
 
-  /** Up to 100 items with ids, answered in order. */
+  /** Up to 100 items with ids, 30,000 characters in all, answered in order. */
   checkBatch(request: BatchRequest): Promise<BatchResponse> {
     if (request.items.length > MAX_BATCH)
       throw new RangeError(`checkBatch takes at most ${MAX_BATCH} items; use checkMany`);
+    if (charsOf(request.items) > MAX_BATCH_CHARS)
+      throw new RangeError(
+        `checkBatch takes at most ${MAX_BATCH_CHARS} characters of text; use checkMany`,
+      );
     return this.call<BatchResponse>('POST', '/v1/check/batch', request);
   }
 
   /**
-   * Any number of texts: chunked into batches of 100, `concurrency`
-   * batches in flight (default 2), results in input order. A chunk that
-   * fails after its retries throws; the chunks already answered are lost
-   * with it, so keep a chunk's worth of texts per call where that matters.
+   * Any number of texts: chunked into batches of up to 100 texts and 30,000
+   * characters, `concurrency` batches in flight (default 2), results in
+   * input order. A text longer than a batch holds goes alone and is refused.
+   * A chunk that fails after its retries throws; the chunks already
+   * answered are lost with it, so keep a chunk's worth of texts per call
+   * where that matters.
    */
   async checkMany(
     texts: string[],
@@ -97,8 +108,21 @@ export class Unprofane {
   ): Promise<BatchResult[]> {
     const { concurrency = 2, ...rest } = options;
     const chunks: BatchItem[][] = [];
-    for (let i = 0; i < texts.length; i += MAX_BATCH)
-      chunks.push(texts.slice(i, i + MAX_BATCH).map((text, j) => ({ id: String(i + j), text })));
+    let chunk: BatchItem[] = [];
+    let chars = 0;
+    texts.forEach((text, i) => {
+      if (
+        chunk.length === MAX_BATCH ||
+        (chunk.length > 0 && chars + text.length > MAX_BATCH_CHARS)
+      ) {
+        chunks.push(chunk);
+        chunk = [];
+        chars = 0;
+      }
+      chunk.push({ id: String(i), text });
+      chars += text.length;
+    });
+    if (chunk.length) chunks.push(chunk);
     const out: BatchResult[][] = new Array(chunks.length);
     let next = 0;
     const worker = async () => {
@@ -140,7 +164,10 @@ export class Unprofane {
     for (;;) {
       let res: Response;
       try {
-        res = await this.fetchImpl(`${this.baseUrl}${path}`, {
+        // Called unbound: a browser or workerd throws "Illegal invocation"
+        // when fetch runs as a method of another object.
+        const fetchImpl = this.fetchImpl;
+        res = await fetchImpl(`${this.baseUrl}${path}`, {
           method,
           headers: {
             authorization: `Bearer ${this.apiKey}`,

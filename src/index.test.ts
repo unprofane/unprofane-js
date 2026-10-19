@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it, vi } from 'vitest';
-import { backoff, SDK_VERSION, Unprofane, UnprofaneError } from './index.ts';
+import { backoff, MAX_BATCH_CHARS, SDK_VERSION, Unprofane, UnprofaneError } from './index.ts';
 
 const ok = (body: unknown, status = 200, headers: Record<string, string> = {}) =>
   new Response(JSON.stringify(body), {
@@ -24,6 +24,22 @@ describe('the JavaScript SDK', () => {
     const h = init.headers as Record<string, string>;
     expect(h.authorization).toBe('Bearer up_test_abc');
     expect(JSON.parse(String(init.body))).toEqual({ text: 'xXsh1tXx', context: 'username' });
+  });
+
+  it('calls the platform fetch as browsers and Workers require, never as a method of the client', async () => {
+    // A browser or workerd throws "Illegal invocation" when fetch runs with
+    // an object as `this`.
+    const strict = vi.fn(function (this: unknown) {
+      if (this !== undefined && this !== globalThis) throw new TypeError('Illegal invocation');
+      return Promise.resolve(ok({ allowed: true, action: 'allow' }));
+    });
+    vi.stubGlobal('fetch', strict);
+    try {
+      const c = new Unprofane('up_test_abc', { retries: 0 });
+      await expect(c.check({ text: 'hello' })).resolves.toMatchObject({ action: 'allow' });
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 
   it('refuses a key that is not one of ours', () => {
@@ -90,6 +106,38 @@ describe('the JavaScript SDK', () => {
         items: Array.from({ length: 101 }, (_, i) => ({ id: String(i), text: 'x' })),
       }),
     ).toThrow(RangeError);
+  });
+
+  it('chunks checkMany at 30,000 characters too, the most the API reads in one batch', async () => {
+    // The API refuses a batch whose texts hold more than 30,000 characters
+    // together (2026-10-19): 100 long texts in one request were refused whole.
+    // The monorepo holds the number to the API's (contracts schemas.test.ts).
+    expect(MAX_BATCH_CHARS).toBe(30_000);
+    const sizes: number[][] = [];
+    const fetchMock = vi.fn(async (_url: string, init: RequestInit) => {
+      const body = JSON.parse(String(init.body)) as { items: Array<{ id: string; text: string }> };
+      sizes.push(body.items.map((i) => i.text.length));
+      return ok({
+        results: body.items.map((i) => ({ id: i.id, result: { allowed: true } })),
+        counted: body.items.length,
+      });
+    });
+    const c = new Unprofane('up_live_k', { fetch: fetchMock as unknown as typeof fetch });
+    const long = Array.from({ length: 4 }, (_, i) => `${i}`.repeat(10_000));
+    const results = await c.checkMany(long, { concurrency: 1 });
+    expect(sizes.map((s) => s.length)).toEqual([3, 1]);
+    expect(results.map((r) => r.id)).toEqual(['0', '1', '2', '3']);
+    sizes.length = 0;
+    await c.checkMany(
+      Array.from({ length: 100 }, () => 'x'.repeat(400)),
+      { concurrency: 1 },
+    );
+    expect(sizes.map((s) => s.length)).toEqual([75, 25]);
+    for (const s of sizes)
+      expect(s.reduce((a, b) => a + b, 0)).toBeLessThanOrEqual(MAX_BATCH_CHARS);
+    expect(() => c.checkBatch({ items: long.map((text, i) => ({ id: String(i), text })) })).toThrow(
+      RangeError,
+    );
   });
 
   it('backs off with jitter under the cap and honours Retry-After', () => {
