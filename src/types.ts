@@ -15,7 +15,7 @@ export type Context =
   | 'creative'
   | 'review'
   | 'custom_text';
-export type PolicyPreset = 'kids' | 'teen' | 'standard' | 'strict';
+export type PolicyPreset = 'kids' | 'teen' | 'standard' | 'strict' | 'casual';
 export type PolicyCategory =
   | 'mild_profanity'
   | 'profanity'
@@ -85,6 +85,9 @@ export interface CheckRequest {
   policy?: Policy;
   mode?: Mode;
   language?: Language;
+  /** Where the readers are, as a two-letter country code (MX, ES, BR): a word
+   * rude in some countries and innocent in others is read as theirs reads it. */
+  country?: string;
   mask?: Mask;
   /** A dated engine version, such as 2026-09-29. */
   engine?: string;
@@ -133,6 +136,7 @@ export interface BatchRequest {
   policy?: Policy;
   mode?: Mode;
   language?: Language;
+  country?: string;
   mask?: Mask;
   engine?: string;
   lists?: RequestLists;
