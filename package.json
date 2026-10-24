@@ -1,6 +1,6 @@
 {
   "name": "@unprofane/sdk",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "description": "Unprofane: a profanity and toxicity API that is hard to fool. Typed client with retries and a batch helper.",
   "license": "MIT",
   "type": "module",

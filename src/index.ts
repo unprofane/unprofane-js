@@ -59,7 +59,7 @@ const MAX_BATCH = 100;
 export const MAX_BATCH_CHARS = 30_000;
 const charsOf = (items: ReadonlyArray<{ text: string }>) =>
   items.reduce((n, i) => n + i.text.length, 0);
-export const SDK_VERSION = '0.1.5';
+export const SDK_VERSION = '0.1.6';
 
 export class Unprofane {
   private readonly apiKey: string;

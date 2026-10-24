@@ -119,6 +119,14 @@ export interface CheckResponse {
   /** Why the action is what it is, in a sentence written from the matches
    * and the policy's decision. For people reading a log, not for parsing. */
   reason: string;
+  /** Each category the policy acted on, strongest first, and what decided
+   * it: `words` it matched, or `context`, the text as a whole as the model
+   * read it with no word to point to. Empty for an allow. */
+  decided_by: Array<{
+    category: PolicyCategory;
+    action: 'review' | 'block';
+    from: 'words' | 'context';
+  }>;
   language: { detected: string; confidence: number };
   engine: { version: string; route: 'rules' | 'model' | 'cache'; degraded: boolean };
   timing_ms: number;
